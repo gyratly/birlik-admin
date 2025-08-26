@@ -1,0 +1,736 @@
+name: Bootstrap Admin App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create project files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p public \
+            src/components/layout \
+            src/components/misc \
+            src/providers \
+            src/pages/{dashboard,moderation,catalog,vendors,billing,orders,content,monetization,ai,support,analytics,settings} \
+            src/utils
+
+          cat > package.json <<'EOF'
+          {
+            "name": "birlik-admin",
+            "version": "0.1.0",
+            "private": true,
+            "dependencies": {
+              "i18next": "^23.7.6",
+              "react": "^18.2.0",
+              "react-dom": "^18.2.0",
+              "react-i18next": "^13.5.0",
+              "react-router-dom": "^6.23.0",
+              "react-scripts": "5.0.1"
+            },
+            "devDependencies": {
+              "@types/node": "^20.11.30",
+              "@types/react": "^18.2.70",
+              "@types/react-dom": "^18.2.23",
+              "autoprefixer": "^10.4.19",
+              "eslint": "^8.57.0",
+              "postcss": "^8.4.38",
+              "prettier": "^3.2.5",
+              "tailwindcss": "^3.4.3",
+              "typescript": "^5.4.5"
+            },
+            "scripts": {
+              "start": "react-scripts start",
+              "build": "react-scripts build",
+              "test": "react-scripts test",
+              "eject": "react-scripts eject"
+            }
+          }
+          EOF
+
+          cat > tsconfig.json <<'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "lib": ["dom", "dom.iterable", "ES2020"],
+              "allowJs": false,
+              "skipLibCheck": true,
+              "esModuleInterop": true,
+              "allowSyntheticDefaultImports": true,
+              "strict": true,
+              "forceConsistentCasingInFileNames": true,
+              "module": "ESNext",
+              "moduleResolution": "Node",
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "jsx": "react-jsx"
+            },
+            "include": ["src"]
+          }
+          EOF
+
+          cat > tailwind.config.js <<'EOF'
+          /** @type {import('tailwindcss').Config} */
+          module.exports = {
+            darkMode: ["class"],
+            content: ["./src/**/*.{js,jsx,ts,tsx}"],
+            theme: {
+              extend: {
+                colors: {
+                  border: "hsl(var(--border))",
+                  input: "hsl(var(--input))",
+                  ring: "hsl(var(--ring))",
+                  background: "hsl(var(--background))",
+                  foreground: "hsl(var(--foreground))",
+                  primary: { DEFAULT: "#2563eb" },
+                  destructive: { DEFAULT: "#ef4444" }
+                },
+                borderRadius: {
+                  lg: "0.5rem",
+                  md: "calc(0.5rem - 2px)",
+                  sm: "calc(0.5rem - 4px)"
+                }
+              }
+            },
+            plugins: []
+          }
+          EOF
+
+          cat > postcss.config.js <<'EOF'
+          module.exports = {
+            plugins: {
+              tailwindcss: {},
+              autoprefixer: {}
+            }
+          };
+          EOF
+
+          cat > vercel.json <<'EOF'
+          {
+            "buildCommand": "npm run build",
+            "outputDirectory": "build",
+            "framework": "cra"
+          }
+          EOF
+
+          cat > .gitignore <<'EOF'
+          node_modules
+          build
+          dist
+          .env
+          *.log
+          .DS_Store
+          .vercel
+          EOF
+
+          cat > .prettierrc <<'EOF'
+          {
+            "semi": true,
+            "singleQuote": false,
+            "printWidth": 100,
+            "tabWidth": 2
+          }
+          EOF
+
+          cat > .eslintrc.json <<'EOF'
+          {
+            "env": { "browser": true, "es2021": true },
+            "extends": ["react-app", "react-app/jest"],
+            "rules": {
+              "no-unused-vars": "warn"
+            }
+          }
+          EOF
+
+          cat > public/index.html <<'EOF'
+          <!doctype html>
+          <html lang="ru">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>Birlik.biz Admin</title>
+            </head>
+            <body>
+              <noscript>Для работы приложения требуется включить JavaScript.</noscript>
+              <div id="root"></div>
+            </body>
+          </html>
+          EOF
+
+          cat > src/index.css <<'EOF'
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+
+          @layer base {
+            :root{
+              --background: 0 0% 100%;
+              --foreground: 222.2 84% 4.9%;
+              --border: 214.3 31.8% 91.4%;
+              --input: 214.3 31.8% 91.4%;
+              --ring: 221.2 83.2% 53.3%;
+            }
+            html, body, #root { height: 100%; }
+          }
+
+          .btn-lg {
+            @apply min-h-12 min-w-[120px] px-6 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition active:scale-[0.98];
+          }
+          EOF
+
+          cat > src/index.tsx <<'EOF'
+          import React from "react";
+          import ReactDOM from "react-dom/client";
+          import { BrowserRouter } from "react-router-dom";
+          import "./index.css";
+          import App from "./App";
+          import { AuthProvider } from "./providers/AuthProvider";
+          import { I18nProvider } from "./providers/I18nProvider";
+
+          const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
+          root.render(
+            <React.StrictMode>
+              <I18nProvider>
+                <AuthProvider>
+                  <BrowserRouter>
+                    <App />
+                  </BrowserRouter>
+                </AuthProvider>
+              </I18nProvider>
+            </React.StrictMode>
+          );
+          EOF
+
+          cat > src/App.tsx <<'EOF'
+          import { Routes, Route, Navigate } from "react-router-dom";
+          import { AppShell } from "./components/layout/AppShell";
+          import Dashboard from "./pages/dashboard";
+          import Moderation from "./pages/moderation";
+          import Catalog from "./pages/catalog";
+          import Vendors from "./pages/vendors";
+          import Billing from "./pages/billing";
+          import Orders from "./pages/orders";
+          import ContentMarketing from "./pages/content";
+          import Monetization from "./pages/monetization";
+          import AI from "./pages/ai";
+          import Support from "./pages/support";
+          import Analytics from "./pages/analytics";
+          import Settings from "./pages/settings";
+
+          function App() {
+            return (
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/moderation/*" element={<Moderation />} />
+                  <Route path="/catalog/*" element={<Catalog />} />
+                  <Route path="/vendors/*" element={<Vendors />} />
+                  <Route path="/billing/*" element={<Billing />} />
+                  <Route path="/orders/*" element={<Orders />} />
+                  <Route path="/content/*" element={<ContentMarketing />} />
+                  <Route path="/monetization/*" element={<Monetization />} />
+                  <Route path="/ai/*" element={<AI />} />
+                  <Route path="/support/*" element={<Support />} />
+                  <Route path="/analytics/*" element={<Analytics />} />
+                  <Route path="/settings/*" element={<Settings />} />
+                </Routes>
+              </AppShell>
+            );
+          }
+          export default App;
+          EOF
+
+          cat > src/components/layout/AppShell.tsx <<'EOF'
+          import { Sidebar } from "./Sidebar";
+          import { Header } from "./Header";
+
+          export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+            return (
+              <div className="h-screen w-full grid grid-rows-[auto_1fr] grid-cols-[280px_1fr]">
+                <div className="col-span-2">
+                  <Header />
+                </div>
+                <aside className="border-r bg-slate-50">
+                  <Sidebar />
+                </aside>
+                <main className="overflow-auto p-6">
+                  {children}
+                </main>
+              </div>
+            );
+          };
+          EOF
+
+          cat > src/components/layout/Header.tsx <<'EOF'
+          import { useAuth } from "../../providers/AuthProvider";
+          import { LanguageSwitcher } from "../misc/LanguageSwitcher";
+
+          export const Header: React.FC = () => {
+            const { role, setRole } = useAuth();
+            return (
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
+                <div className="font-semibold">Birlik.biz Admin</div>
+                <div className="flex items-center gap-3">
+                  <LanguageSwitcher />
+                  <RoleSwitcher currentRole={role} onRoleChange={setRole} />
+                </div>
+              </div>
+            );
+          };
+
+          type UserRole = "admin" | "moderator" | "vendor_admin" | "outlet_manager" | "pos_cashier" | "support";
+
+          export const RoleSwitcher: React.FC<{currentRole: UserRole; onRoleChange:(r:UserRole)=>void}> = ({ currentRole, onRoleChange }) => {
+            const roles = [
+              { id: 'admin', name: 'Администратор' },
+              { id: 'moderator', name: 'Модератор' },
+              { id: 'vendor_admin', name: 'Админ продавца' },
+              { id: 'outlet_manager', name: 'Менеджер точки' },
+              { id: 'pos_cashier', name: 'Кассир POS' },
+              { id: 'support', name: 'Техподдержка' }
+            ] as const;
+
+            return (
+              <div className="text-sm">
+                <select
+                  className="border rounded px-2 py-1"
+                  value={currentRole}
+                  onChange={(e)=>onRoleChange(e.target.value as UserRole)}
+                >
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <div className="text-xs text-gray-500 mt-1">Демо режим — переключение ролей</div>
+              </div>
+            );
+          };
+          EOF
+
+          cat > src/components/layout/Sidebar.tsx <<'EOF'
+          import { NavLink } from "react-router-dom";
+          import { useAuth } from "../../providers/AuthProvider";
+          import { getMenuForRole } from "../../utils/permissions";
+
+          export const Sidebar: React.FC = () => {
+            const { role } = useAuth();
+            const menu = getMenuForRole(role);
+
+            return (
+              <nav className="p-3">
+                {menu.map(section => (
+                  <div key={section.title} className="mb-4">
+                    <div className="px-2 text-xs font-semibold text-slate-500 uppercase">{section.title}</div>
+                    <ul className="mt-2 space-y-1">
+                      {section.items.map(item => (
+                        <li key={item.path}>
+                          <NavLink
+                            to={item.path}
+                            className={({isActive}) =>
+                              \`flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-100 \${isActive ? "bg-blue-50 border border-blue-200 text-blue-700" : ""}\`
+                            }
+                          >
+                            <span>{item.label}</span>
+                            {item.badge && <span className="text-xs bg-blue-600 text-white rounded px-2 py-0.5">{item.badge}</span>}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </nav>
+            );
+          };
+          EOF
+
+          cat > src/components/misc/LanguageSwitcher.tsx <<'EOF'
+          import { useTranslation } from "react-i18next";
+
+          const langs = [
+            { code: 'tk', name: 'Türkmen', flag: '🇹🇲' },
+            { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+            { code: 'en', name: 'English', flag: '🇺🇸' },
+            { code: 'uz', name: "O'zbek", flag: '🇺🇿' }
+          ] as const;
+
+          export const LanguageSwitcher: React.FC = () => {
+            const { i18n } = useTranslation();
+            return (
+              <select
+                className="border rounded px-2 py-1 text-sm"
+                value={i18n.language}
+                onChange={(e)=>i18n.changeLanguage(e.target.value)}
+              >
+                {langs.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name}</option>)}
+              </select>
+            );
+          };
+          EOF
+
+          cat > src/providers/AuthProvider.tsx <<'EOF'
+          import React, { createContext, useContext, useMemo, useState } from "react";
+          import { detailedRoleConfigurations } from "../utils/permissions";
+
+          type UserRole = keyof typeof detailedRoleConfigurations;
+
+          interface AuthCtx {
+            role: UserRole;
+            setRole: (r: UserRole) => void;
+            permissions: typeof detailedRoleConfigurations[UserRole]["permissions"];
+          }
+          const Ctx = createContext<AuthCtx | null>(null);
+
+          export const AuthProvider: React.FC<{children:React.ReactNode}> = ({ children }) => {
+            const [role, setRole] = useState<UserRole>("admin");
+            const permissions = useMemo(()=> detailedRoleConfigurations[role].permissions, [role]);
+            return <Ctx.Provider value={{ role, setRole, permissions }}>{children}</Ctx.Provider>
+          };
+
+          export const useAuth = () => {
+            const v = useContext(Ctx);
+            if (!v) throw new Error("useAuth must be used within AuthProvider");
+            return v;
+          };
+          EOF
+
+          cat > src/providers/I18nProvider.tsx <<'EOF'
+          import React from "react";
+          import i18n from "i18next";
+          import { initReactI18next, I18nextProvider } from "react-i18next";
+
+          const resources = {
+            ru: { common: { dashboard: "Дашборд" } },
+            tk: { common: { dashboard: "Dolandyryş paneli" } },
+            en: { common: { dashboard: "Dashboard" } },
+            uz: { common: { dashboard: "Boshqaruv paneli" } }
+          };
+
+          i18n.use(initReactI18next).init({
+            resources,
+            lng: "ru",
+            fallbackLng: "ru",
+            interpolation: { escapeValue: false }
+          });
+
+          export const I18nProvider: React.FC<{children:React.ReactNode}> = ({ children }) => {
+            return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>;
+          };
+          EOF
+
+          cat > src/utils/permissions.ts <<'EOF'
+          type Action = 'read' | 'write' | 'delete' | 'admin' | 'moderate' | 'sell';
+          interface Permission {
+            module: string;
+            action: Action;
+            resource?: string;
+            scope?: string;
+          }
+          interface RoleConfig {
+            id: string;
+            name: string;
+            permissions: Permission[];
+            dashboardWidgets: string[];
+            menuItems: string[] | ['all'];
+            dataFilters: Record<string, any>;
+          }
+
+          export const detailedRoleConfigurations = {
+            admin: {
+              id: 'admin',
+              name: 'Администратор маркетплейса',
+              permissions: [
+                { module: '*', action: 'admin' },
+                { module: 'categories', action: 'admin' },
+                { module: 'moderation_rules', action: 'admin' },
+                { module: 'tariffs', action: 'admin' }
+              ],
+              dashboardWidgets: ['all'],
+              menuItems: ['all'],
+              dataFilters: {}
+            },
+            moderator: {
+              id: 'moderator',
+              name: 'Модератор маркетплейса',
+              permissions: [
+                { module: 'master_products', action: 'moderate' },
+                { module: 'master_products', action: 'read' },
+                { module: 'product_offers', action: 'read' },
+                { module: 'vendors', action: 'read' },
+                { module: 'moderation_queue', action: 'admin' }
+              ],
+              dashboardWidgets: ['moderation_queue','moderation_stats','processing_time'],
+              menuItems: ['dashboard','moderation','catalog','vendors'],
+              dataFilters: { showOnlyModerationData: true }
+            },
+            vendor_admin: {
+              id: 'vendor_admin',
+              name: 'Админ продавца',
+              permissions: [
+                { module: 'master_products', action: 'write', scope: 'create_requests' },
+                { module: 'product_offers', action: 'admin', scope: 'own_vendor' },
+                { module: 'orders', action: 'read', scope: 'own_vendor' },
+                { module: 'outlets', action: 'admin', scope: 'own_vendor' },
+                { module: 'subscriptions', action: 'admin', scope: 'own_vendor' },
+                { module: 'users', action: 'admin', scope: 'own_vendor' },
+                { module: 'storefront', action: 'admin', scope: 'own_vendor' }
+              ],
+              dashboardWidgets: ['own_sales','own_products','subscription_status','storefront_stats'],
+              menuItems: ['dashboard','catalog','orders','billing','storefront','users'],
+              dataFilters: { vendorId: 'current_user_vendor' }
+            },
+            outlet_manager: {
+              id: 'outlet_manager',
+              name: 'Менеджер точки',
+              permissions: [
+                { module: 'outlets', action: 'admin', scope: 'own_outlet' },
+                { module: 'pos_system', action: 'admin', scope: 'own_outlet' },
+                { module: 'pos_users', action: 'admin', scope: 'own_outlet' },
+                { module: 'cash_sessions', action: 'read', scope: 'own_outlet' },
+                { module: 'inventory', action: 'admin', scope: 'own_outlet' }
+              ],
+              dashboardWidgets: ['outlet_sales','pos_status','inventory','cash_sessions'],
+              menuItems: ['dashboard','orders','pos_settings','users','reports'],
+              dataFilters: { outletId: 'current_user_outlet' }
+            },
+            pos_cashier: {
+              id: 'pos_cashier',
+              name: 'Кассир POS',
+              permissions: [
+                { module: 'pos_system', action: 'sell', scope: 'assigned_pos' },
+                { module: 'cash_sessions', action: 'admin', scope: 'own_sessions' },
+                { module: 'orders', action: 'read', scope: 'own_pos_sales' }
+              ],
+              dashboardWidgets: ['today_sales','cash_session','pos_status'],
+              menuItems: ['dashboard','pos','cash_session'],
+              dataFilters: { posId: 'assigned_pos', cashierId: 'current_user' }
+            },
+            support: {
+              id: 'support',
+              name: 'Техподдержка',
+              permissions: [{ module: '*', action: 'read' }],
+              dashboardWidgets: ['tickets_queue','response_time','user_activity'],
+              menuItems: ['dashboard','support','users','orders'],
+              dataFilters: { maskPersonalData: true }
+            }
+          } as const;
+
+          type RoleKey = keyof typeof detailedRoleConfigurations;
+
+          export const getMenuForRole = (role: RoleKey) => {
+            const roleCfg = detailedRoleConfigurations[role];
+            const full = [
+              { title: "Основное", items: [{ path: "/dashboard", label: "Dashboard" }] },
+              { title: "Управление", items: [
+                { path: "/users", label: "Пользователи" },
+                { path: "/moderation", label: "Модерация" },
+                { path: "/catalog", label: "Каталог" },
+                { path: "/vendors", label: "Продавцы" }
+              ]},
+              { title: "Продажи", items: [
+                { path: "/billing", label: "Подписки и биллинг", badge: "5" },
+                { path: "/orders", label: "Заказы" }
+              ]},
+              { title: "Контент", items: [
+                { path: "/content", label: "Контент и маркетинг" },
+                { path: "/ai", label: "ИИ и автоматизация" }
+              ]},
+              { title: "Поддержка", items: [
+                { path: "/support", label: "Техподдержка", badge: "12" },
+                { path: "/analytics", label: "Аналитика и отчеты" }
+              ]},
+              { title: "Настройки", items: [{ path: "/settings", label: "Системные настройки" }] }
+            ];
+            if (roleCfg.menuItems[0] === 'all') return full;
+            return full
+              .map(sec => ({...sec, items: sec.items.filter(i => roleCfg.menuItems.includes(i.label.toLowerCase() as any))}))
+              .filter(sec => sec.items.length);
+          };
+          EOF
+
+          cat > src/pages/dashboard/index.tsx <<'EOF'
+          export default function Dashboard() {
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Дашборд</h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="p-4 border rounded-lg bg-white">KPI: Master-продукты ≥ 90%</div>
+                  <div className="p-4 border rounded-lg bg-white">KPI: Время модерации ≤ 24ч</div>
+                  <div className="p-4 border rounded-lg bg-white">KPI: POS офлайн ≥ 72ч</div>
+                  <div className="p-4 border rounded-lg bg-white">KPI: Конверсия ≤ 4мин</div>
+                </div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/moderation/index.tsx <<'EOF'
+          export default function Moderation(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Очередь модерации</h1>
+                <div className="p-4 border rounded-lg bg-white">
+                  Таблица заявок + фильтры (демо-заглушка). Кнопки: Одобрить / Отклонить / Запросить доработку.
+                </div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/catalog/index.tsx <<'EOF'
+          export default function Catalog(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Каталог и товары</h1>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <div className="p-4 border rounded-lg bg-white">Дерево категорий (drag&drop)</div>
+                  <div className="p-4 border rounded-lg bg-white">Атрибуты и свойства</div>
+                </div>
+                <div className="p-4 border rounded-lg bg-white">Master-продукты vs Предложения (список + bulk-actions)</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/vendors/index.tsx <<'EOF'
+          export default function Vendors(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Продавцы</h1>
+                <div className="p-4 border rounded-lg bg-white">Реестр продавцов (таблица с фильтрами)</div>
+                <div className="p-4 border rounded-lg bg-white">Торговые точки (POS мониторинг)</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/billing/index.tsx <<'EOF'
+          export default function Billing(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Подписки и биллинг</h1>
+                <div className="p-4 border rounded-lg bg-white">Тарифные планы / Подписки / Платежи</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/orders/index.tsx <<'EOF'
+          export default function Orders(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Заказы и возвраты</h1>
+                <div className="p-4 border rounded-lg bg-white">Все заказы (таблица) + Возвраты</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/content/index.tsx <<'EOF'
+          export default function ContentMarketing(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Контент и маркетинг</h1>
+                <div className="p-4 border rounded-lg bg-white">Баннеры, акции, SEO, доставка, оплаты</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/monetization/index.tsx <<'EOF'
+          export default function Monetization(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Монетизация</h1>
+                <div className="p-4 border rounded-lg bg-white">Платное продвижение, комиссии, плагины, аукционы</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/ai/index.tsx <<'EOF'
+          export default function AI(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">ИИ и автоматизация</h1>
+                <div className="p-4 border rounded-lg bg-white">Настройки ИИ, качество, дубликаты, автогенерация</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/support/index.tsx <<'EOF'
+          export default function Support(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Техподдержка</h1>
+                <div className="p-4 border rounded-lg bg-white">Очередь тикетов, чат, база знаний</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/analytics/index.tsx <<'EOF'
+          export default function Analytics(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Аналитика и отчеты</h1>
+                <div className="p-4 border rounded-lg bg-white">Сводные дашборды, финансовые отчеты, POS аналитика</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/pages/settings/index.tsx <<'EOF'
+          export default function Settings(){
+            return (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-semibold">Системные настройки</h1>
+                <div className="p-4 border rounded-lg bg-white">Глобальные параметры, интеграции, фискализация, GDPR, уведомления, SLA</div>
+              </div>
+            );
+          }
+          EOF
+
+          cat > src/components/layout/AppShell.tsx <<'EOF'
+          import { Sidebar } from "./Sidebar";
+          import { Header } from "./Header";
+
+          export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+            return (
+              <div className="h-screen w-full grid grid-rows-[auto_1fr] grid-cols-[280px_1fr]">
+                <div className="col-span-2">
+                  <Header />
+                </div>
+                <aside className="border-r bg-slate-50">
+                  <Sidebar />
+                </aside>
+                <main className="overflow-auto p-6">
+                  {children}
+                </main>
+              </div>
+            );
+          };
+          EOF
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "Bootstrap admin app scaffold"
+          body: |
+            Этот PR добавляет стартовый каркас приложения (React + TypeScript + Tailwind) и базовые страницы/провайдеры.
+          branch: feat/bootstrap-admin
+          base: main
+          commit-message: "chore: bootstrap admin app scaffold"
+          labels: bootstrap, scaffolding
+          delete-branch: true
