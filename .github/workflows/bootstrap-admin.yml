@@ -11,12 +11,27 @@ jobs:
   bootstrap:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Create project files
+      - name: Prepare and clone repo (no external actions)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
+          echo "Cloning ${GITHUB_REPOSITORY}..."
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+
+          # start from main
+          git fetch origin main
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            git checkout -B feat/bootstrap-admin origin/main
+          else
+            # empty repo case
+            git checkout -b feat/bootstrap-admin
+          fi
 
           mkdir -p public \
             src/components/layout \
@@ -338,7 +353,7 @@ jobs:
                           <NavLink
                             to={item.path}
                             className={({isActive}) =>
-                              \`flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-100 \${isActive ? "bg-blue-50 border border-blue-200 text-blue-700" : ""}\`
+                              `flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-100 ${isActive ? "bg-blue-50 border border-blue-200 text-blue-700" : ""}`
                             }
                           >
                             <span>{item.label}</span>
@@ -702,35 +717,32 @@ jobs:
           }
           EOF
 
-          cat > src/components/layout/AppShell.tsx <<'EOF'
-          import { Sidebar } from "./Sidebar";
-          import { Header } from "./Header";
+          # Commit and push
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "chore: bootstrap admin app scaffold"
+            git push -u origin feat/bootstrap-admin
+          else
+            echo "No changes to commit."
+          fi
 
-          export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-            return (
-              <div className="h-screen w-full grid grid-rows-[auto_1fr] grid-cols-[280px_1fr]">
-                <div className="col-span-2">
-                  <Header />
-                </div>
-                <aside className="border-r bg-slate-50">
-                  <Sidebar />
-                </aside>
-                <main className="overflow-auto p-6">
-                  {children}
-                </main>
-              </div>
-            );
-          };
-          EOF
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          title: "Bootstrap admin app scaffold"
-          body: |
-            Этот PR добавляет стартовый каркас приложения (React + TypeScript + Tailwind) и базовые страницы/провайдеры.
-          branch: feat/bootstrap-admin
-          base: main
-          commit-message: "chore: bootstrap admin app scaffold"
-          labels: bootstrap, scaffolding
-          delete-branch: true
+          # Create PR (try gh first, then REST)
+          set +e
+          if command -v gh >/dev/null 2>&1; then
+            gh pr view feat/bootstrap-admin >/dev/null 2>&1 || \
+            gh pr create --title "Bootstrap admin app scaffold" \
+                         --body "Этот PR добавляет стартовый каркас приложения (React + TypeScript + Tailwind) и базовые страницы/провайдеры." \
+                         --base main --head feat/bootstrap-admin
+          else
+            echo "gh not found, using REST API..."
+            PR_DATA=$(jq -n --arg title "Bootstrap admin app scaffold" \
+                           --arg body "Этот PR добавляет стартовый каркас приложения (React + TypeScript + Tailwind) и базовые страницы/провайдеры." \
+                           --arg base "main" --arg head "feat/bootstrap-admin" \
+                           '{title:$title, body:$body, base:$base, head:$head}')
+            curl -sS -H "Authorization: token ${GH_TOKEN}" \
+                 -H "Accept: application/vnd.github+json" \
+                 -X POST \
+                 -d "${PR_DATA}" \
+                 "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" \
+                 | jq -r '.html_url // "PR created (check Pull requests tab)"'
+          fi
